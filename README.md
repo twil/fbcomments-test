@@ -16,7 +16,7 @@ Project Setup
 
 ```bash
 $ mkvirtualenv fbcomments-test
-$ git clone git@gitlab.com:akaidalov/fbcomments-test.git
+$ git clone git@github.com:twil/fbcomments-test.git
 $ cd fbcomments-test
 ./fbcomments-test$ workon fbcomments-test
 (fbcomments-test)./fbcomments-test$ pip install -r requirements.txt
