@@ -109,6 +109,11 @@ Device (a.k.a. TV)
 
 https://developers.facebook.com/docs/facebook-login/for-devices
 
+Server-to-Server Request
+------------------------
+
+Somehow with an App Secret or Client Token.
+
 
 
 Check The `limit` For The `/comments` Edge of The `/post` Node
