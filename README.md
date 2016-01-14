@@ -32,7 +32,7 @@ The Basic Thoughts
 1. [Batch Requests](https://developers.facebook.com/docs/graph-api/making-multiple-requests)? might be we can fabricate paged URLs with `offset` and `since`?
 1. Error procession. If response (JSON) has `error` property then request failed.
 1. [Rate limiting](https://developers.facebook.com/docs/graph-api/advanced/rate-limiting). App Level Throttling: 200 calls/person/hour (Error Code 4).
-1. Don't request unneeded fields (we need only `date_created` to calculate the frequency of comments).
+1. Don't request unneeded fields (we need only `created_time` to calculate the frequency of comments).
 1. [Timeouts](https://developers.facebook.com/docs/graph-api/making-multiple-requests#timeouts).
 1. Use `multiprocessing`
 1. Use Google Charts
@@ -46,7 +46,7 @@ Zero Approximation
 ==================
 
 1. Get an Access Token somehow (out of scope at this moment)
-1. Get all the comments timestamps using Cursor-based pagination with 10k limit and selecting only `date_created` field
+1. Get all the comments timestamps using Cursor-based pagination with 10k limit and selecting only `created_time` field
 1. Calculate the frequencies for 5 min intervals
 1. Create a report folder
 1. Save data `data.json`
@@ -66,6 +66,9 @@ Codes to wait and retry:
 
 How To Get Access Token
 =======================
+
+With JS
+-------
 
 In Chrome Dev Tools (app is configured for `test.domain` domain)
 
@@ -91,6 +94,21 @@ FB.login(function(){}, {scope: ''});
 
 FB.getAuthResponse();
 ```
+
+Desktop (without JS)
+--------------------
+
+```
+https://www.facebook.com/dialog/oauth?client_id=645041415635369&redirect_uri=https://www.facebook.com/connect/login_success.html&response_type=token
+```
+
+After confirmation of permissions you'll be redirected to a new URL with `access_token` in it.
+
+Device (a.k.a. TV)
+------------------
+
+https://developers.facebook.com/docs/facebook-login/for-devices
+
 
 
 Check The `limit` For The `/comments` Edge of The `/post` Node
