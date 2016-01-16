@@ -5,8 +5,10 @@ from __future__ import unicode_literals
 import os
 import argparse
 import readline
+from datetime import datetime
 
 import requests
+from pandas import Series, date_range
 
 
 REPORT_TEMPLATE = 'templates/report.html'
@@ -16,7 +18,7 @@ DATA_FILE_NAME = 'data.json'
 # Limit for the /comments edge
 # We specially put a greater value - FB will limit it
 COMMENTS_LIMIT = 10000
-DEFAULT_AGGREGATION_INTERVAL = 5 # minutes
+DEFAULT_AGGREGATION_INTERVAL = '1Min'
 
 DEFAULT_CPUS_NUMBER = 4
 
@@ -36,17 +38,22 @@ def get_comments(post_id, access_token, limit=COMMENTS_LIMIT):
     res = requests.get(url)
     json = res.json()
 
-    data = json['data']
+    timestamps = [datetime.strptime(c['created_time'], '%Y-%m-%dT%H:%M:%S+0000') for c in json['data']]
     if 'paging' in json:
         if 'next' in json['paging']:
             next_url = json['paging']['next']
         #if 'cursors' in json['paging'] and 'after' in json['paging']['cursors']:
             next_cursor = json['paging']['cursors']['after']
 
-    return data, next_url, next_cursor
+    return timestamps, next_url, next_cursor
 
-def calculate_frequencies(comments):
-    return []
+
+def calculate_frequencies(comments,
+                          aggregation_interval=DEFAULT_AGGREGATION_INTERVAL):
+    s = Series([1] * len(comments), comments)
+    freq = s.resample(aggregation_interval, how='sum')
+    return freq
+
 
 def save_report(frequencies, output_folder):
     pass
@@ -74,4 +81,5 @@ Yes/no: """ % (abs_path, REPORT_FILE_NAME, DATA_FILE_NAME))
 
     comments, next_url, next_cursor = get_comments(args.post_id,
                                                    args.access_token)
-    print(len(comments))
+    calculate_frequencies(comments)
+    #print(len(comments))
