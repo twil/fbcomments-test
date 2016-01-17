@@ -36,7 +36,8 @@ The Basic Thoughts
 1. [Timeouts](https://developers.facebook.com/docs/graph-api/making-multiple-requests#timeouts).
 1. Use `multiprocessing`
 1. Use Google Charts
-1. `pandas` has a very neat way for calculating needed frequencies `Series.resample('3Min', how='sum')`. But how to parallelize the whole thing?
+1. `pandas` has a very neat way for calculating needed frequencies `Series.resample('3Min', how='sum', label='right')`. But how to parallelize the whole thing?
+1. **[how to parallelize]** Ok. The last index after `Series.resample()` of one page will be the same as the first one of the next page. In this case we need to sum these values to merge two sequences. If per chance the first index of the second page is different then we need to concatenate two sequences and that's it! 
 
 So we have ~52k comments for the given post (10151775534413086) and 200 requests per hour per user and a limit of 5k comments in a single request (it might be less?).
 

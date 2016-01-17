@@ -18,7 +18,7 @@ DATA_FILE_NAME = 'data.json'
 # Limit for the /comments edge
 # We specially put a greater value - FB will limit it
 COMMENTS_LIMIT = 10000
-DEFAULT_AGGREGATION_INTERVAL = '1Min'
+DEFAULT_AGGREGATION_INTERVAL = '5Min'
 
 DEFAULT_CPUS_NUMBER = 4
 
@@ -38,6 +38,7 @@ def get_comments(post_id, access_token, limit=COMMENTS_LIMIT):
     res = requests.get(url)
     json = res.json()
 
+    # created_time is in UTC
     timestamps = [datetime.strptime(c['created_time'], '%Y-%m-%dT%H:%M:%S+0000') for c in json['data']]
     if 'paging' in json:
         if 'next' in json['paging']:
@@ -51,7 +52,7 @@ def get_comments(post_id, access_token, limit=COMMENTS_LIMIT):
 def calculate_frequencies(comments,
                           aggregation_interval=DEFAULT_AGGREGATION_INTERVAL):
     s = Series([1] * len(comments), comments)
-    freq = s.resample(aggregation_interval, how='sum')
+    freq = s.resample(aggregation_interval, how='sum', label='right')
     return freq
 
 
@@ -81,5 +82,9 @@ Yes/no: """ % (abs_path, REPORT_FILE_NAME, DATA_FILE_NAME))
 
     comments, next_url, next_cursor = get_comments(args.post_id,
                                                    args.access_token)
-    calculate_frequencies(comments)
+    frequencies = calculate_frequencies(comments)
     #print(len(comments))
+    #print "comments"
+    #print comments[:10]
+    #print "freq"
+    #print frequencies
