@@ -72,7 +72,10 @@ def calculate_frequencies(comments,
                           aggregation_interval=DEFAULT_AGGREGATION_INTERVAL):
     s = Series([1] * len(comments), comments)
     freq = s.resample(aggregation_interval, how='sum', label='right')
-    return freq.fillna(0)
+
+    #return freq.fillna(0)
+    freq.dropna(inplace=True)
+    return freq
 
 
 def save_report(frequencies, output_folder):

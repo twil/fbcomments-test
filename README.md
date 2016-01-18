@@ -44,7 +44,7 @@ So we have ~52k comments for the given post (10151775534413086) and 200 requests
 
 We need 11 requests to procession the data.
 
-52k comments in 5 minute buckets are 257k timestamps!
+52k comments in 5 minute buckets are 257k timestamps! We can drop NA values. That'll give ~4k values.
 
 
 Zero Approximation
