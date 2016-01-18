@@ -26,34 +26,53 @@ DEFAULT_CPUS_NUMBER = 4
 COMMENTS_EDGE = "https://graph.facebook.com/v2.5/{post_id}/comments?fields=created_time&limit={limit}&pretty=0&summary=1&filter=stream&access_token={access_token}"
 
 
-def get_comments(post_id, access_token, limit=COMMENTS_LIMIT):
+def start_processing_comments(post_id, access_token, limit=COMMENTS_LIMIT):
+    """
+    Init URL for a first request
+    """
+
+    url = COMMENTS_EDGE.format(post_id=post_id, limit=limit,
+                               access_token=access_token)
+
+    # TODO: how to parallelize???
+    timestamps = []
+    while True:
+        ts, url, cursor = request_comments(url)
+        timestamps.extend(ts)
+        if url is None:
+            break
+
+    return timestamps
+
+
+def request_comments(url):
     """
     Run HTTP request and process it.
     
     Return: comments list, next page URL, cursor
     """
 
-    url = COMMENTS_EDGE.format(post_id=post_id, limit=limit,
-                               access_token=access_token)
     res = requests.get(url)
     json = res.json()
 
     # created_time is in UTC
     timestamps = [datetime.strptime(c['created_time'], '%Y-%m-%dT%H:%M:%S+0000') for c in json['data']]
+    next_url = None
+    cursor = None
     if 'paging' in json:
         if 'next' in json['paging']:
             next_url = json['paging']['next']
-        #if 'cursors' in json['paging'] and 'after' in json['paging']['cursors']:
-            next_cursor = json['paging']['cursors']['after']
+        if 'cursors' in json['paging'] and 'after' in json['paging']['cursors']:
+            cursor = json['paging']['cursors']['after']
 
-    return timestamps, next_url, next_cursor
+    return timestamps, next_url, cursor
 
 
 def calculate_frequencies(comments,
                           aggregation_interval=DEFAULT_AGGREGATION_INTERVAL):
     s = Series([1] * len(comments), comments)
     freq = s.resample(aggregation_interval, how='sum', label='right')
-    return freq
+    return freq.fillna(0)
 
 
 def save_report(frequencies, output_folder):
@@ -80,10 +99,9 @@ Yes/no: """ % (abs_path, REPORT_FILE_NAME, DATA_FILE_NAME))
     else:
         os.mkdir(abs_path)
 
-    comments, next_url, next_cursor = get_comments(args.post_id,
-                                                   args.access_token)
+    comments = start_processing_comments(args.post_id, args.access_token)
     frequencies = calculate_frequencies(comments)
-    #print(len(comments))
+    print(len(frequencies))
     #print "comments"
     #print comments[:10]
     #print "freq"

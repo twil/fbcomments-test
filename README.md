@@ -37,11 +37,14 @@ The Basic Thoughts
 1. Use `multiprocessing`
 1. Use Google Charts
 1. `pandas` has a very neat way for calculating needed frequencies `Series.resample('3Min', how='sum', label='right')`. But how to parallelize the whole thing?
-1. **[how to parallelize]** Ok. The last index after `Series.resample()` of one page will be the same as the first one of the next page. In this case we need to sum these values to merge two sequences. If per chance the first index of the second page is different then we need to concatenate two sequences and that's it! 
+1. The last index after `Series.resample()` of one page will be the same as the first one of the next page. In this case we need to sum these values to merge two sequences. If per chance the first index of the second page is different then we need to concatenate two sequences and that's it!
+1. **How to parallelize?** We get pages from FB sequentially. We can only parallelize procession of received data:(
 
 So we have ~52k comments for the given post (10151775534413086) and 200 requests per hour per user and a limit of 5k comments in a single request (it might be less?).
 
 We need 11 requests to procession the data.
+
+52k comments in 5 minute buckets are 257k timestamps!
 
 
 Zero Approximation
