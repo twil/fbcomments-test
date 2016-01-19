@@ -28,7 +28,7 @@ The Basic Thoughts
 ==================
 
 1. FB requests are pretty simple - we can use `requests` library.
-1. Cursor-based Pagination or Time-based Pagination (not working with comments edge!) - this way we can parallelize prosession of comments. Initially we use Cursor-based Pagination and then when we need to update data we will use Time-based Pagination. We need to store the latest post's timestamp though.
+1. Cursor-based Pagination. Time-based and Offset-based pagination doesn't work with /comments edge! (https://developers.facebook.com/tools/explorer/)
 1. [Batch Requests](https://developers.facebook.com/docs/graph-api/making-multiple-requests)? might be we can fabricate paged URLs with `offset` and `since`?
 1. Error procession. If response (JSON) has `error` property then request failed.
 1. [Rate limiting](https://developers.facebook.com/docs/graph-api/advanced/rate-limiting). App Level Throttling: 200 calls/person/hour (Error Code 4).
@@ -39,6 +39,7 @@ The Basic Thoughts
 1. `pandas` has a very neat way for calculating needed frequencies `Series.resample('3Min', how='sum', label='right')`. But how to parallelize the whole thing?
 1. The last index after `Series.resample()` of one page will be the same as the first one of the next page. In this case we need to sum these values to merge two sequences. If per chance the first index of the second page is different then we need to concatenate two sequences and that's it!
 1. **How to parallelize?** We get pages from FB sequentially. We can only parallelize procession of received data:(
+1. FB docs are not so good - `order` on the `/comments` edge can be `chronological` and `reverse_chronological`. This means we can "eat" comments from two sides in parallel!
 
 So we have ~52k comments for the given post (10151775534413086) and 200 requests per hour per user and a limit of 5k comments in a single request (it might be less?).
 
