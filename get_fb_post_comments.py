@@ -54,41 +54,68 @@ def start_processing_comments(post_id, access_token, limit=COMMENTS_LIMIT):
     timestamps_chron = []
     timestamps_reverse = []
     while True:
-        print "Here!"
         (res_chron, res_reverse) = pool.map(request_comments, [url_chron,
                                                                url_reverse])
-        # we manipulate this list
-        reverse_timestamps = res_reverse[0]
-
-        ts_right = res_chron[0][-1]
-        ts_left = res_reverse[0][-1]
 
         url_chron = res_chron[1]
         url_reverse = res_reverse[1]
 
-        # we hit the middle. drop extra values
-        if ts_right >= ts_left:
-            try:
-                i = reverse_timestamps.index(ts_right)
-                reverse_timestamps = reverse_timestamps[:i]
-            # if index is not found then ts_left < res_chron[0][0]
-            except ValueError:
-                reverse_timestamps = []
+        chron_timestamps, reverse_timestamps, is_intersect = \
+            if_timestamps_intersect(res_chron[0], res_reverse[0])
 
-        timestamps_chron.append(res_chron[0])
+        timestamps_chron.append(chron_timestamps)
         # in place
         reverse_timestamps.reverse()
         timestamps_reverse.append(reverse_timestamps)
 
-        if ts_right >= ts_left:
+        if is_intersect:
             break
 
     # Process timestamps
-    # # in place
+    # in place
     timestamps_reverse.reverse()
     timestamps_chron.extend(timestamps_reverse)
 
     fs = pool.map(calculate_frequencies, timestamps_chron)
+    frequencies = join_frequencies(fs)
+
+    return frequencies
+
+
+def if_timestamps_intersect(chron_timestamps, reverse_timestamps):
+    """
+    Check if chron_timestamps[-1] timestamp is > then reverse_timestamps[-1]
+    and return shrinked reverse_timestamps
+    """
+
+    is_intersect = False
+
+    ts_right = chron_timestamps[-1]
+    ts_left = reverse_timestamps[-1]
+
+    # we hit the middle. drop extra values
+    if ts_right >= ts_left:
+        is_intersect = True
+        try:
+            i = reverse_timestamps.index(ts_right)
+            reverse_timestamps = reverse_timestamps[:i]
+        # if index is not found then ts_left < res_chron[0][0]
+        except ValueError:
+            reverse_timestamps = []
+
+    return chron_timestamps, reverse_timestamps, is_intersect
+
+
+def join_frequencies(fs):
+    """
+    fs is a list of lists, eg.
+    [
+        [],
+        [],
+        ...
+    ]
+    """
+
     frequencies = None
     for f in fs:
         if frequencies is None:
@@ -97,29 +124,6 @@ def start_processing_comments(post_id, access_token, limit=COMMENTS_LIMIT):
         frequencies = frequencies.add(f, fill_value=0)
 
     return frequencies
-
-    # TODO: how to parallelize???
-    #timestamps = []
-    #while True:
-    #    ts, url, cursor = request_comments(url)
-    #    timestamps.extend(ts)
-    #    if url is None:
-    #        break
-
-    #return timestamps
-
-
-'''
-def process_comments(url):
-    """
-    Task for multiprocessing
-    """
-
-    timestamps, next_url, cursor = request_comments(url)
-    frequencies = calculate_frequencies(comments)
-
-    return frequencies, next_url
-'''
 
 
 def request_comments(url):
@@ -182,7 +186,3 @@ Yes/no: """ % (abs_path, REPORT_FILE_NAME, DATA_FILE_NAME))
     frequencies = start_processing_comments(args.post_id, args.access_token)
 
     print(len(frequencies))
-    #print "comments"
-    #print comments[:10]
-    #print "freq"
-    #print frequencies
