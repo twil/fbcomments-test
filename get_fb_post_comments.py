@@ -6,6 +6,7 @@ import os
 import argparse
 import readline
 from datetime import datetime
+from multiprocessing import Process, Pool, cpu_count
 
 import requests
 from pandas import Series, date_range
@@ -19,11 +20,16 @@ DATA_FILE_NAME = 'data.json'
 # We specially put a greater value - FB will limit it
 COMMENTS_LIMIT = 10000
 DEFAULT_AGGREGATION_INTERVAL = '5Min'
+DEFAULT_PROCESS_TIMEOUT = 60
+
+ORDER_CHRONOLOGICAL = 'chronological'
+ORDER_REVERSE_CHRONOLOGICAL = 'reverse_chronological'
+DEFAULT_ORDER = ORDER_CHRONOLOGICAL
 
 DEFAULT_CPUS_NUMBER = 4
 
 # Graph API URLs
-COMMENTS_EDGE = "https://graph.facebook.com/v2.5/{post_id}/comments?fields=created_time&limit={limit}&pretty=0&summary=1&filter=stream&access_token={access_token}"
+COMMENTS_EDGE = "https://graph.facebook.com/v2.5/{post_id}/comments?fields=created_time&limit={limit}&pretty=0&summary=1&filter=stream&order={order}&access_token={access_token}"
 
 
 def start_processing_comments(post_id, access_token, limit=COMMENTS_LIMIT):
@@ -31,18 +37,89 @@ def start_processing_comments(post_id, access_token, limit=COMMENTS_LIMIT):
     Init URL for a first request
     """
 
-    url = COMMENTS_EDGE.format(post_id=post_id, limit=limit,
-                               access_token=access_token)
+    url_chron = COMMENTS_EDGE.format(post_id=post_id, limit=limit,
+                                     order=ORDER_CHRONOLOGICAL,
+                                     access_token=access_token)
+    url_reverse = COMMENTS_EDGE.format(post_id=post_id, limit=limit,
+                                     order=ORDER_REVERSE_CHRONOLOGICAL,
+                                     access_token=access_token)
 
-    # TODO: how to parallelize???
-    timestamps = []
+    cpus = DEFAULT_CPUS_NUMBER
+    try:
+        cpus = cpu_count()
+    except NotImplementedError:
+        pass
+    pool = Pool(processes=cpus)
+
+    timestamps_chron = []
+    timestamps_reverse = []
     while True:
-        ts, url, cursor = request_comments(url)
-        timestamps.extend(ts)
-        if url is None:
+        print "Here!"
+        (res_chron, res_reverse) = pool.map(request_comments, [url_chron,
+                                                               url_reverse])
+        # we manipulate this list
+        reverse_timestamps = res_reverse[0]
+
+        ts_right = res_chron[0][-1]
+        ts_left = res_reverse[0][-1]
+
+        url_chron = res_chron[1]
+        url_reverse = res_reverse[1]
+
+        # we hit the middle. drop extra values
+        if ts_right >= ts_left:
+            try:
+                i = reverse_timestamps.index(ts_right)
+                reverse_timestamps = reverse_timestamps[:i]
+            # if index is not found then ts_left < res_chron[0][0]
+            except ValueError:
+                reverse_timestamps = []
+
+        timestamps_chron.append(res_chron[0])
+        # in place
+        reverse_timestamps.reverse()
+        timestamps_reverse.append(reverse_timestamps)
+
+        if ts_right >= ts_left:
             break
 
-    return timestamps
+    # Process timestamps
+    # # in place
+    timestamps_reverse.reverse()
+    timestamps_chron.extend(timestamps_reverse)
+
+    fs = pool.map(calculate_frequencies, timestamps_chron)
+    frequencies = None
+    for f in fs:
+        if frequencies is None:
+            frequencies = f
+            continue
+        frequencies = frequencies.add(f, fill_value=0)
+
+    return frequencies
+
+    # TODO: how to parallelize???
+    #timestamps = []
+    #while True:
+    #    ts, url, cursor = request_comments(url)
+    #    timestamps.extend(ts)
+    #    if url is None:
+    #        break
+
+    #return timestamps
+
+
+'''
+def process_comments(url):
+    """
+    Task for multiprocessing
+    """
+
+    timestamps, next_url, cursor = request_comments(url)
+    frequencies = calculate_frequencies(comments)
+
+    return frequencies, next_url
+'''
 
 
 def request_comments(url):
@@ -102,8 +179,8 @@ Yes/no: """ % (abs_path, REPORT_FILE_NAME, DATA_FILE_NAME))
     else:
         os.mkdir(abs_path)
 
-    comments = start_processing_comments(args.post_id, args.access_token)
-    frequencies = calculate_frequencies(comments)
+    frequencies = start_processing_comments(args.post_id, args.access_token)
+
     print(len(frequencies))
     #print "comments"
     #print comments[:10]
