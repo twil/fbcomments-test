@@ -1,0 +1,106 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <title>FB Post {{ post_id }} Comments Frequency</title>
+    <meta name="description" content="">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+
+<body>
+
+<div id="dashboard_div">
+	<div id="chart_div" style="width: 100%; height: 300px;"></div>
+	<div id="control_div" style="width: 100%; height: 50px;"></div>
+</div>
+
+
+<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+<!-- must contain frequencies var.  -->
+<script type="text/javascript" src="data.js"></script>
+
+<script type="text/javascript">
+google.charts.load('current', {packages: ['corechart', 'table', 'gauge', 'controls']});
+google.charts.setOnLoadCallback(drawChart);
+
+
+function drawChart() {
+
+	var data = new google.visualization.DataTable();
+	data.addColumn('datetime', 'Time');
+	data.addColumn('number', 'Comments per {{ interval }}');
+
+	// save first comment
+	var firstDate = null;
+	for(var i in frequencies['data']) {
+		var v = frequencies['data'][i];
+		var d = new Date();
+		d.setTime(v[0] * 1000);
+		data.addRow([d, v[1]]);
+
+		if(firstDate === null) {
+			firstDate = d;
+		}
+	}
+
+	// get initial dates for filter
+    var endRange = new Date();
+    endRange.setTime(firstDate.getTime());
+    endRange.setDate(endRange.getDate() + 1);
+
+    var dashboard = new google.visualization.Dashboard(
+	        document.getElementById('dashboard_div'));
+
+	var control = new google.visualization.ControlWrapper({
+      'controlType': 'ChartRangeFilter',
+      'containerId': 'control_div',
+      'options': {
+        // Filter by the date axis.
+        'filterColumnIndex': 0,
+        'ui': {
+          'chartType': 'LineChart',
+          'chartOptions': {
+            'chartArea': {'width': '90%'},
+            'hAxis': {
+            	'baselineColor': 'none',
+            	//logScale: true
+            }
+          },
+          'chartView': {
+            'columns': [0, 1]
+          },
+          // 1 day in milliseconds = 24 * 60 * 60 * 1000 = 86,400,000
+          'minRangeSize': 86400000
+        }
+      },
+      // Initial range: 2012-02-09 to 2012-03-20.
+      'state': {'range': {'start': firstDate, 'end': endRange}}
+    });
+
+    var chart = new google.visualization.ChartWrapper({
+    	'chartType': 'ScatterChart',
+        'containerId': 'chart_div',
+        'options': {
+          title: 'Comments frequency',
+          // Use the same chart area width as the control for axis alignment.
+          'chartArea': {'height': '80%', 'width': '90%'},
+          'hAxis': {
+        	  title: 'Time',
+        	  slantedText: false,
+        	  //logScale: true
+          },
+          'vAxis': {
+        	  title: 'Comments per {{ interval }}'
+          },
+          'legend': {'position': 'none'}
+        }
+    });
+
+    dashboard.bind(control, chart);
+    dashboard.draw(data);
+}
+</script>
+
+</body>
+</html>

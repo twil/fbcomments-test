@@ -3,21 +3,21 @@
 from __future__ import unicode_literals
 
 import os
-import shutil
 import signal
 import argparse
 import readline
 from datetime import datetime
-from multiprocessing import Process, Pool, cpu_count
+from multiprocessing import Pool, cpu_count
 import json
 
 import requests
+import numpy
 from pandas import Series, date_range
 
 
 REPORT_TEMPLATE = 'templates/report.html'
 REPORT_FILE_NAME = 'report.html'
-DATA_FILE_NAME = 'data.json'
+DATA_FILE_NAME = 'data.js'
 
 # Limit for the /comments edge
 # We specially put a greater value - FB will limit it
@@ -39,13 +39,8 @@ COMMENTS_EDGE = "https://graph.facebook.com/v2.5/{post_id}/comments?fields=creat
 
 class SeriesEncoder(json.JSONEncoder):
     def default(self, obj):
-        print type(obj)
-        if isinstance(obj, numpy.integer):
-            return int(obj)
-        elif isinstance(obj, numpy.floating):
-            return float(obj)
-        elif isinstance(obj, numpy.ndarray):
-            return obj.tolist()
+        if isinstance(obj, Series):
+            return [(_to_timestamp(i), v) for i, v in obj.iteritems()]
         else:
             return super(SeriesEncoder, self).default(obj)
 
@@ -53,6 +48,8 @@ class SeriesEncoder(json.JSONEncoder):
 def start_processing_comments(post_id, access_token, limit=COMMENTS_LIMIT):
     """
     Init URL for a first request
+
+    TODO: we need to control this function. pass pool as an argument?
     """
 
     url_chron = COMMENTS_EDGE.format(post_id=post_id, limit=limit,
@@ -67,7 +64,7 @@ def start_processing_comments(post_id, access_token, limit=COMMENTS_LIMIT):
         cpus = cpu_count()
     except NotImplementedError:
         pass
-    pool = Pool(processes=cpus, initializer=init_worker)
+    pool = Pool(processes=cpus, initializer=_init_worker)
 
     timestamps_chron = []
     timestamps_reverse = []
@@ -183,30 +180,51 @@ def calculate_frequencies(comments,
 
 
 def save_report(output_folder, frequencies,
-                interval=DEFAULT_AGGREGATION_INTERVAL):
+                interval=DEFAULT_AGGREGATION_INTERVAL, **kwargs):
     """
     Save frequencies and meta data + html template in a specified folder
+
+    `kwargs` contains post_id and might have additional meta data
     """
 
     data = {
         "interval": interval,
         "data": frequencies,
     }
+    data.update(kwargs)
 
-    # report.html
-    shutil.copy(os.path.join(BASE_DIR, REPORT_TEMPLATE),
-                os.path.join(output_folder, REPORT_FILE_NAME))
+    # report.html template
+    with open(os.path.join(BASE_DIR, REPORT_TEMPLATE)) as f:
+        template = f.read()
+
+    template = template.replace('{{ post_id }}', kwargs.get('post_id', ''))
+    template = template.replace('{{ interval }}', interval)
+
+    with open(os.path.join(output_folder, REPORT_FILE_NAME), 'w') as f:
+        f.write(template)
 
     with open(os.path.join(output_folder, DATA_FILE_NAME), 'w') as f:
+        f.write('var frequencies = ')
         json.dump(data, f, indent=2, cls=SeriesEncoder)
+        f.write(';')
 
 
-def init_worker():
+def _init_worker():
     """
     Hide SIGINT from a worker
     """
 
     signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+
+def _to_timestamp(d):
+    """
+    Convert datetime to UTC timestamp
+
+    d must be in UTC
+    """
+
+    return int((d - datetime(1970, 1, 1)).total_seconds())
 
 
 if __name__ == '__main__':
@@ -230,4 +248,4 @@ Yes/no: """ % (abs_path, REPORT_FILE_NAME, DATA_FILE_NAME))
         os.mkdir(abs_path)
 
     frequencies = start_processing_comments(args.post_id, args.access_token)
-    save_report(abs_path, frequencies)
+    save_report(abs_path, frequencies, post_id=args.post_id)
