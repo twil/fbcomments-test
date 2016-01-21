@@ -3,10 +3,13 @@
 from __future__ import unicode_literals
 
 import os
+import shutil
+import signal
 import argparse
 import readline
 from datetime import datetime
 from multiprocessing import Process, Pool, cpu_count
+import json
 
 import requests
 from pandas import Series, date_range
@@ -28,8 +31,23 @@ DEFAULT_ORDER = ORDER_CHRONOLOGICAL
 
 DEFAULT_CPUS_NUMBER = 4
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 # Graph API URLs
 COMMENTS_EDGE = "https://graph.facebook.com/v2.5/{post_id}/comments?fields=created_time&limit={limit}&pretty=0&summary=1&filter=stream&order={order}&access_token={access_token}"
+
+
+class SeriesEncoder(json.JSONEncoder):
+    def default(self, obj):
+        print type(obj)
+        if isinstance(obj, numpy.integer):
+            return int(obj)
+        elif isinstance(obj, numpy.floating):
+            return float(obj)
+        elif isinstance(obj, numpy.ndarray):
+            return obj.tolist()
+        else:
+            return super(SeriesEncoder, self).default(obj)
 
 
 def start_processing_comments(post_id, access_token, limit=COMMENTS_LIMIT):
@@ -49,27 +67,32 @@ def start_processing_comments(post_id, access_token, limit=COMMENTS_LIMIT):
         cpus = cpu_count()
     except NotImplementedError:
         pass
-    pool = Pool(processes=cpus)
+    pool = Pool(processes=cpus, initializer=init_worker)
 
     timestamps_chron = []
     timestamps_reverse = []
     while True:
-        (res_chron, res_reverse) = pool.map(request_comments, [url_chron,
-                                                               url_reverse])
-
-        url_chron = res_chron[1]
-        url_reverse = res_reverse[1]
-
-        chron_timestamps, reverse_timestamps, is_intersect = \
-            if_timestamps_intersect(res_chron[0], res_reverse[0])
-
-        timestamps_chron.append(chron_timestamps)
-        # in place
-        reverse_timestamps.reverse()
-        timestamps_reverse.append(reverse_timestamps)
-
-        if is_intersect:
-            break
+        try:
+            (res_chron, res_reverse) = pool.map(request_comments, [url_chron,
+                                                                   url_reverse])
+    
+            url_chron = res_chron[1]
+            url_reverse = res_reverse[1]
+    
+            chron_timestamps, reverse_timestamps, is_intersect = \
+                if_timestamps_intersect(res_chron[0], res_reverse[0])
+    
+            timestamps_chron.append(chron_timestamps)
+            # in place
+            reverse_timestamps.reverse()
+            timestamps_reverse.append(reverse_timestamps)
+    
+            if is_intersect:
+                break
+        except (KeyboardInterrupt, SystemExit):
+            pool.terminate()
+            print('Exiting...')
+            exit()
 
     # Process timestamps
     # in place
@@ -159,8 +182,31 @@ def calculate_frequencies(comments,
     return freq
 
 
-def save_report(frequencies, output_folder):
-    pass
+def save_report(output_folder, frequencies,
+                interval=DEFAULT_AGGREGATION_INTERVAL):
+    """
+    Save frequencies and meta data + html template in a specified folder
+    """
+
+    data = {
+        "interval": interval,
+        "data": frequencies,
+    }
+
+    # report.html
+    shutil.copy(os.path.join(BASE_DIR, REPORT_TEMPLATE),
+                os.path.join(output_folder, REPORT_FILE_NAME))
+
+    with open(os.path.join(output_folder, DATA_FILE_NAME), 'w') as f:
+        json.dump(data, f, indent=2, cls=SeriesEncoder)
+
+
+def init_worker():
+    """
+    Hide SIGINT from a worker
+    """
+
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
 
 
 if __name__ == '__main__':
@@ -184,5 +230,4 @@ Yes/no: """ % (abs_path, REPORT_FILE_NAME, DATA_FILE_NAME))
         os.mkdir(abs_path)
 
     frequencies = start_processing_comments(args.post_id, args.access_token)
-
-    print(len(frequencies))
+    save_report(abs_path, frequencies)
