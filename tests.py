@@ -13,3 +13,12 @@ class SeriesProcessionTestCase(TestCase):
 
     def test_test(self):
         assert 1 == 1
+
+    def test_series_json_encoder(self):
+        pass
+
+    def test_timestamps_intersect(self):
+        pass
+
+    def test_calculate_frequencies(self):
+        pass
