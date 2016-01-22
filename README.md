@@ -6,6 +6,7 @@ Prerequisites
 * Python 2.7
 * virtualenvwrapper 4.5.1
 * FB Graph API version 2.5
+* Internet connection
 
 ```bash
 $ source virtualenvwrapper.sh
