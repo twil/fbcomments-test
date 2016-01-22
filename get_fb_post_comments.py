@@ -86,7 +86,7 @@ def start_processing_comments(post_id, access_token, limit=COMMENTS_LIMIT):
             url_reverse = res_reverse[1]
     
             chron_timestamps, reverse_timestamps, is_intersect = \
-                if_timestamps_intersect(res_chron[0], res_reverse[0])
+                intersect_timestamps(res_chron[0], res_reverse[0])
     
             timestamps_chron.append(chron_timestamps)
             # in place
@@ -128,7 +128,7 @@ def start_processing_comments(post_id, access_token, limit=COMMENTS_LIMIT):
     return frequencies
 
 
-def if_timestamps_intersect(chron_timestamps, reverse_timestamps):
+def intersect_timestamps(chron_timestamps, reverse_timestamps):
     """
     Check if chron_timestamps[-1] timestamp is > then reverse_timestamps[-1]
     and return shrinked reverse_timestamps
