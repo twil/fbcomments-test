@@ -29,9 +29,8 @@ DEFAULT_PROCESS_TIMEOUT = 60
 
 ORDER_CHRONOLOGICAL = 'chronological'
 ORDER_REVERSE_CHRONOLOGICAL = 'reverse_chronological'
-DEFAULT_ORDER = ORDER_CHRONOLOGICAL
 
-DEFAULT_CPUS_NUMBER = 4
+CPUS_NUMBER = 2
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -61,11 +60,12 @@ def start_processing_comments(post_id, access_token, limit=COMMENTS_LIMIT):
                                      order=ORDER_REVERSE_CHRONOLOGICAL,
                                      access_token=access_token)
 
-    cpus = DEFAULT_CPUS_NUMBER
-    try:
-        cpus = cpu_count()
-    except NotImplementedError:
-        pass
+    cpus = CPUS_NUMBER
+    # We need only to parallelize HTTP Get requests
+    #try:
+    #    cpus = cpu_count()
+    #except NotImplementedError:
+    #    pass
     pool = Pool(processes=cpus, initializer=_init_worker)
 
     if DEBUG_TIMING:
@@ -240,7 +240,10 @@ def _init_worker():
     Hide SIGINT from a worker
     """
 
-    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    def handler(signum, frame):
+        print("Exiting worker process...")
+
+    signal.signal(signal.SIGINT, handler)
 
 
 def _to_timestamp(d):
