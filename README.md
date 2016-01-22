@@ -55,7 +55,7 @@ Zero Approximation
 1. Get all the comments timestamps using Cursor-based pagination with 10k limit and selecting only `created_time` field
 1. Calculate the frequencies for 5 min intervals
 1. Create a report folder
-1. Save data `data.json`
+1. Save data `data.js`
 1. Copy template `report.html` into the report folder
 
 

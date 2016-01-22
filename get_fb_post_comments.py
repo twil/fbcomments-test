@@ -9,11 +9,14 @@ import readline
 from datetime import datetime
 from multiprocessing import Pool, cpu_count
 import json
+import time
+from itertools import imap
 
 import requests
 import numpy
 from pandas import Series, date_range
 
+DEBUG_TIMING = False
 
 REPORT_TEMPLATE = 'templates/report.html'
 REPORT_FILE_NAME = 'report.html'
@@ -66,13 +69,20 @@ def start_processing_comments(post_id, access_token, limit=COMMENTS_LIMIT):
         pass
     pool = Pool(processes=cpus, initializer=_init_worker)
 
+    if DEBUG_TIMING:
+        t_start = time.time()
+
     timestamps_chron = []
     timestamps_reverse = []
     while True:
         try:
+            #(res_chron, res_reverse) = map(request_comments, [url_chron,
+            #                                                  url_reverse])
+
+            # 2x performance boost
             (res_chron, res_reverse) = pool.map(request_comments, [url_chron,
                                                                    url_reverse])
-    
+
             url_chron = res_chron[1]
             url_reverse = res_reverse[1]
     
@@ -91,13 +101,30 @@ def start_processing_comments(post_id, access_token, limit=COMMENTS_LIMIT):
             print('Exiting...')
             exit()
 
+    if DEBUG_TIMING:
+        print("Recieved comments in %s seconds" % (time.time() - t_start))
+        t_start = time.time()
+
     # Process timestamps
     # in place
+    # 7 orders faster then HTTP requests
     timestamps_reverse.reverse()
     timestamps_chron.extend(timestamps_reverse)
 
-    fs = pool.map(calculate_frequencies, timestamps_chron)
+    if DEBUG_TIMING:
+        print("Combined timestamps in %s seconds" % (time.time() - t_start))
+        t_start = time.time()
+
+    #fs = pool.map(calculate_frequencies, timestamps_chron)
+
+    # 2x boost. looks like data transfer between processes takes a lot of time
+    # and calculations are pretty simple.
+    # 3 orders faster then HTTP requests
+    fs = imap(calculate_frequencies, timestamps_chron)
     frequencies = join_frequencies(fs)
+
+    if DEBUG_TIMING:
+        print("Calculated frequencies in %s seconds" % (time.time() - t_start))
 
     return frequencies
 
@@ -130,8 +157,8 @@ def join_frequencies(fs):
     """
     fs is a list of lists, eg.
     [
-        [],
-        [],
+        [<timestamp>, <comments_count>],
+        [<timestamp>, <comments_count>],
         ...
     ]
     """
@@ -230,6 +257,10 @@ def _to_timestamp(d):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
                 description='Get a comments frequency for a FB post')
+    parser.add_argument('--time', action='store_true',
+                        help='Time critical places')
+    parser.add_argument('--yes', action='store_true',
+                        help='Force "yes" answers')
     parser.add_argument('post_id', type=str, help='FB post ID')
     parser.add_argument('access_token', type=str, help='Access Token')
     parser.add_argument('output_folder', type=str, help='Output folder')
@@ -237,15 +268,23 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     abs_path = os.path.abspath(args.output_folder)
-    if os.path.exists(args.output_folder):
+    if os.path.exists(args.output_folder) and not args.yes:
         answer = raw_input("""Are you sure you want to use this folder '%s'?
 Existing '%s' and '%s' files will be overwritten.
 Yes/no: """ % (abs_path, REPORT_FILE_NAME, DATA_FILE_NAME))
         if answer.lower() != 'yes':
             print('Exiting...')
             exit()
+    elif args.yes:
+        print("Overwritting '%s' and '%s' files." % (REPORT_FILE_NAME,
+                                                     DATA_FILE_NAME))
     else:
         os.mkdir(abs_path)
+
+    # debug timing
+    # HACK: global state
+    if args.time:
+        DEBUG_TIMING = True
 
     frequencies = start_processing_comments(args.post_id, args.access_token)
     save_report(abs_path, frequencies, post_id=args.post_id)
