@@ -59,8 +59,20 @@ Zero Approximation
 1. Copy template `report.html` into the report folder
 
 
+Testing
+=======
+
+Tests are written in `tests.py`. To run a test suite issue:
+
+```bash
+(fbcomments-test)./fbcomments-test$ nosetests
+```
+
+
 Errors Procession
 =================
+
+TODO:
 
 Codes to wait and retry:
 * 1 - API Unknown. Retry and forget if not successful.

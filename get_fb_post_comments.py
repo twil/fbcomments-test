@@ -13,8 +13,7 @@ import time
 from itertools import imap
 
 import requests
-import numpy
-from pandas import Series, date_range
+from pandas import Series
 
 DEBUG_TIMING = False
 
